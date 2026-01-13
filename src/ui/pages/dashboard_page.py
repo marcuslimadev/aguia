@@ -2,13 +2,14 @@
 Página de Dashboard
 """
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout,
-    QFrame, QScrollArea, QTableWidget, QTableWidgetItem, QGraphicsDropShadowEffect
+    QWidget, QVBoxLayout, QLabel, QGridLayout,
+    QFrame, QTableWidget, QTableWidgetItem
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
-from PySide6.QtWidgets import QGraphicsDropShadowEffect
 import logging
+
+from config.ui_theme import color_for_severity, color_for_status, contrast_text
 
 logger = logging.getLogger(__name__)
 
@@ -84,19 +85,12 @@ class DashboardPage(QWidget):
         """Cria um card de estatistica"""
         card = QFrame()
         card.setObjectName("StatCard")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(18)
-        shadow.setOffset(0, 3)
-        shadow.setColor(QColor("#cecece"))
-        card.setGraphicsEffect(shadow)
-
         layout = QVBoxLayout()
         title_label = QLabel(title)
         title_label.setObjectName("StatTitle")
         title_font = QFont()
         title_font.setPointSize(11)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #666;")
 
         self.value_label = QLabel(value)
         self.value_label.setObjectName("StatValue")
@@ -104,7 +98,6 @@ class DashboardPage(QWidget):
         value_font.setPointSize(28)
         value_font.setBold(True)
         self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet("color: #2196F3;")
 
         layout.addWidget(title_label)
         layout.addWidget(self.value_label)
@@ -135,6 +128,7 @@ class DashboardPage(QWidget):
 
             # Atualizar card de alertas
             self.alerts_card.value_label.setText(str(len(unacknowledged)))
+            self._update_alert_card_state(bool(unacknowledged))
 
             # Atualizar tabela de alertas
             self.alerts_table.setRowCount(min(len(unacknowledged), 10))
@@ -145,15 +139,13 @@ class DashboardPage(QWidget):
                 camera_item = QTableWidgetItem(str(alert.camera_id))
                 status_item = QTableWidgetItem("Active")
 
-                # Colorir por severidade
-                severity_colors = {
-                    'low': QColor(255, 193, 7),
-                    'medium': QColor(255, 152, 0),
-                    'high': QColor(244, 67, 54),
-                    'critical': QColor(183, 28, 28)
-                }
-                color = severity_colors.get(alert.severity, QColor(33, 150, 243))
-                severity_item.setForeground(color)
+                severity_hex = color_for_severity(alert.severity)
+                severity_item.setBackground(QColor(severity_hex))
+                severity_item.setForeground(QColor(contrast_text(severity_hex)))
+
+                status_hex = color_for_status("active")
+                status_item.setBackground(QColor(status_hex))
+                status_item.setForeground(QColor(contrast_text(status_hex)))
 
                 self.alerts_table.setItem(row, 0, time_item)
                 self.alerts_table.setItem(row, 1, event_item)
@@ -163,6 +155,12 @@ class DashboardPage(QWidget):
 
         except Exception as e:
             logger.error(f"Erro ao atualizar dashboard automaticamente: {e}")
+
+    def _update_alert_card_state(self, has_alerts: bool):
+        self.alerts_card.setProperty("alert", has_alerts)
+        self.alerts_card.style().unpolish(self.alerts_card)
+        self.alerts_card.style().polish(self.alerts_card)
+        self.alerts_card.update()
 
     def closeEvent(self, event):
         """Limpar timer ao fechar"""

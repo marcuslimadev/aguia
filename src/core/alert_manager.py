@@ -11,6 +11,8 @@ from typing import List, Optional
 from pathlib import Path
 import threading
 
+from config.ui_theme import PALETTE, color_for_severity
+
 logger = logging.getLogger(__name__)
 
 
@@ -110,12 +112,10 @@ class EmailNotifier:
 
     def _create_email_body(self, alert: Alert) -> str:
         """Cria o corpo do email em HTML"""
-        severity_color = {
-            'low': '#FFC107',
-            'medium': '#FF9800',
-            'high': '#F44336',
-            'critical': '#B71C1C'
-        }.get(alert.severity, '#2196F3')
+        severity_color = color_for_severity(alert.severity)
+        content_bg = PALETTE["surface_alt"]
+        footer_bg = PALETTE["sidebar"]
+        footer_text = PALETTE["accent_text"]
 
         html = f"""
         <html>
@@ -124,8 +124,8 @@ class EmailNotifier:
                     body {{ font-family: Arial, sans-serif; }}
                     .container {{ max-width: 600px; margin: 0 auto; }}
                     .header {{ background-color: {severity_color}; color: white; padding: 20px; border-radius: 5px 5px 0 0; }}
-                    .content {{ background-color: #f5f5f5; padding: 20px; }}
-                    .footer {{ background-color: #333; color: white; padding: 10px; text-align: center; font-size: 12px; }}
+                    .content {{ background-color: {content_bg}; padding: 20px; }}
+                    .footer {{ background-color: {footer_bg}; color: {footer_text}; padding: 10px; text-align: center; font-size: 12px; }}
                     .detail {{ margin: 10px 0; }}
                     .label {{ font-weight: bold; }}
                 </style>
@@ -413,4 +413,3 @@ class AlertManager:
                 description += f" ({metadata['person_count']} people)"
         
         return description
-

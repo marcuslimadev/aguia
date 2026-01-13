@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from config.config import APP_DATA_DIR
+from config.config import APP_CONFIG_DIR, DEFAULT_APP_DATA_DIR
 
 
 class AppSettings:
@@ -21,7 +21,8 @@ class AppSettings:
         "smtp_username": "alert@socimob.com",
         "smtp_password": "MundoMelhor@10",
         "smtp_from": "alert@socimob.com",
-        "smtp_use_tls": True
+        "smtp_use_tls": True,
+        "data_dir": str(DEFAULT_APP_DATA_DIR)
     }
 
     def __init__(self, path: Path):
@@ -30,7 +31,7 @@ class AppSettings:
 
     @classmethod
     def load(cls) -> "AppSettings":
-        path = APP_DATA_DIR / "settings.json"
+        path = APP_CONFIG_DIR / "settings.json"
         settings = cls(path)
         if path.exists():
             try:

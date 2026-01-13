@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
 
+from config.ui_theme import color_for_status, contrast_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -277,16 +279,15 @@ class FeedbackPage(QWidget):
                     is_real = feedback[3]
                     if is_real is None:
                         feedback_text = "Pending"
-                        color = QColor(255, 193, 7)
                     elif is_real:
                         feedback_text = "Real"
-                        color = QColor(76, 175, 80)
                     else:
                         feedback_text = "False Positive"
-                        color = QColor(244, 67, 54)
 
                     feedback_item = QTableWidgetItem(feedback_text)
-                    feedback_item.setBackground(color)
+                    feedback_hex = color_for_status(feedback_text)
+                    feedback_item.setBackground(QColor(feedback_hex))
+                    feedback_item.setForeground(QColor(contrast_text(feedback_hex)))
                     self.feedback_table.setItem(row, 3, feedback_item)
 
                     # Notes
@@ -294,6 +295,7 @@ class FeedbackPage(QWidget):
 
                     # Actions
                     delete_btn = QPushButton("Delete")
+                    delete_btn.setObjectName("DangerButton")
                     delete_btn.clicked.connect(
                         lambda checked, fid=feedback[0]: self.delete_feedback(fid)
                     )

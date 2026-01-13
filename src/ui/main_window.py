@@ -8,12 +8,13 @@ from typing import Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QPushButton, QLabel, QMessageBox, QStatusBar, QFrame, QGraphicsDropShadowEffect
+    QPushButton, QLabel, QMessageBox, QStatusBar, QFrame
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QFont, QColor
+from PySide6.QtGui import QIcon, QFont
 
 from config.config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
+from config.ui_theme import get_app_stylesheet
 from src.ui.pages.login_page import LoginPage
 from src.ui.pages.dashboard_page import DashboardPage
 from src.ui.pages.cameras_page import CamerasPage, SettingsPage
@@ -80,6 +81,7 @@ class MainWindow(QMainWindow):
         nav_container.addSpacing(8)
         nav_layout = QVBoxLayout()
         self.nav_buttons = {}
+        self.nav_labels = {}
 
         pages_info = [
             ("Dashboard", "dashboard"),
@@ -103,6 +105,7 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda checked, p=page_id: self.navigate_to_page(p))
             nav_layout.addWidget(btn)
             self.nav_buttons[page_id] = btn
+            self.nav_labels[page_id] = label
 
         nav_container.addLayout(nav_layout)
         nav_container.addStretch()
@@ -133,7 +136,6 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.user_label)
 
         self.top_bar.setLayout(top_layout)
-        self._add_shadow(self.top_bar)
         content_layout.addWidget(self.top_bar)
 
         # Stacked widget para paginas
@@ -206,13 +208,6 @@ class MainWindow(QMainWindow):
         self.tray_app = tray_app
         self._update_engine_status()
 
-    def _add_shadow(self, widget, blur_radius=18, y_offset=3):
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(blur_radius)
-        shadow.setOffset(0, y_offset)
-        shadow.setColor(QColor("#cecece"))
-        widget.setGraphicsEffect(shadow)
-
     def _update_engine_status(self):
         if self.tray_app:
             self.tray_app.set_engine_status(self.engine_manager.is_running)
@@ -231,197 +226,24 @@ class MainWindow(QMainWindow):
 
     def apply_stylesheet(self):
         """Aplica estilos CSS"""
-        stylesheet = """
-        * {
-            font-family: "Futura", "Century Gothic", "Bahnschrift", "Segoe UI", Arial;
-            font-size: 11.5pt;
-            color: #111111;
-        }
-        QMainWindow {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 #fff7e6, stop:1 #f2f2f2);
-        }
-        QWidget#AppRoot {
-            background: transparent;
-        }
-        QFrame#Sidebar {
-            background-color: #111111;
-            min-width: 210px;
-            max-width: 240px;
-        }
-        QLabel#BrandLabel {
-            color: #ffffff;
-            font-size: 17pt;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-        QFrame#TopBar {
-            background-color: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 10px;
-        }
-        QLabel#PageTitle {
-            font-size: 17pt;
-            font-weight: 700;
-            color: #111111;
-        }
-        QLabel#UserLabel {
-            color: #111111;
-        }
-        QFrame#ContentFrame {
-            background: transparent;
-        }
-        QPushButton#NavButton {
-            text-align: left;
-            background: transparent;
-            color: #ffffff;
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-        }
-        QPushButton#NavButton:hover {
-            background-color: rgba(255, 255, 255, 0.12);
-        }
-        QPushButton#NavButton:checked {
-            background-color: rgba(0, 91, 187, 0.25);
-            color: #ffffff;
-        }
-        QPushButton#NavButtonDanger {
-            text-align: left;
-            background: transparent;
-            color: #ffd4d4;
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-        }
-        QPushButton#NavButtonDanger:hover {
-            background-color: rgba(255, 0, 0, 0.15);
-            color: #ffffff;
-        }
-        QPushButton {
-            background-color: #005bbb;
-            color: #ffffff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-        }
-        QPushButton:hover {
-            background-color: #004a9a;
-        }
-        QPushButton:pressed {
-            background-color: #003a7a;
-        }
-        QLineEdit, QTextEdit, QComboBox, QSpinBox, QTabWidget::pane, QTableWidget {
-            border: none;
-            border-radius: 8px;
-            padding: 6px 8px;
-            background-color: #ffffff;
-        }
-        QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
-            background-color: #fff4bf;
-        }
-        QTabBar::tab {
-            background: #ffcc00;
-            color: #111111;
-            padding: 8px 14px;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            margin-right: 4px;
-            font-weight: 600;
-        }
-        QTabBar::tab:selected {
-            background: #ffffff;
-            border: none;
-        }
-        QGroupBox {
-            border: none;
-            border-radius: 10px;
-            margin-top: 12px;
-            background: #ffffff;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 6px;
-            color: #111111;
-            font-weight: 600;
-        }
-        QHeaderView::section {
-            background-color: #f2f2f2;
-            border: none;
-            padding: 6px 8px;
-            font-weight: 600;
-            color: #111111;
-        }
-        QTableWidget {
-            gridline-color: transparent;
-        }
-        QTableWidget::item:selected {
-            background-color: #ffcc00;
-            color: #111111;
-        }
-        QProgressBar {
-            border: none;
-            border-radius: 8px;
-            text-align: center;
-            background: #ffffff;
-        }
-        QProgressBar::chunk {
-            background-color: #d40000;
-            border-radius: 8px;
-        }
-        QFrame#StatCard {
-            background-color: #ffffff;
-            border: none;
-            border-radius: 12px;
-            padding: 14px;
-        }
-        QFrame#StatCard QLabel#StatTitle {
-            color: #111111;
-            font-weight: 600;
-        }
-        QFrame#StatCard QLabel#StatValue {
-            color: #005bbb;
-            font-size: 22pt;
-            font-weight: 700;
-        }
-        QFrame#LoginCard {
-            background-color: rgba(255, 255, 255, 0.96);
-            border: none;
-            border-radius: 14px;
-        }
-        QLabel#LoginTitle {
-            font-size: 20pt;
-            font-weight: 700;
-            color: #111111;
-        }
-        QLabel#LoginSubtitle {
-            color: #111111;
-        }
-        QTabWidget#LoginTabs::pane {
-            border: none;
-            border-radius: 10px;
-        }
-        QFrame#LoginCard QLabel {
-            font-size: 11.5pt;
-        }
-        QFrame#LiveViewHeader QLabel {
-            font-size: 12pt;
-            font-weight: 600;
-        }
-        QFrame#LiveViewHeader QPushButton {
-            min-width: 140px;
-        }
-        QStatusBar {
-            background: #ffffff;
-            border-top: none;
-            color: #111111;
-        }
-        """
-        self.setStyleSheet(stylesheet)
+        self.setStyleSheet(get_app_stylesheet())
+
+    def _set_alert_indicator(self, count: int):
+        alert_btn = self.nav_buttons.get("alerts")
+        if not alert_btn:
+            return
+
+        if count > 0:
+            alert_btn.setText(f"Alerts ({count})")
+            alert_btn.setProperty("alert", True)
+            self.status_bar.showMessage(f"!! {count} new alert(s)")
+        else:
+            alert_btn.setText(self.nav_labels.get("alerts", "Alerts"))
+            alert_btn.setProperty("alert", False)
+
+        alert_btn.style().unpolish(alert_btn)
+        alert_btn.style().polish(alert_btn)
+        alert_btn.update()
 
     def show_login_page(self):
         """Mostra a pagina de login"""
@@ -464,6 +286,7 @@ class MainWindow(QMainWindow):
             self.show_login_page()
             self.hide_navigation()
             self.status_bar.showMessage("Logged out")
+            self._set_alert_indicator(0)
             return
 
         for pid, btn in self.nav_buttons.items():
@@ -509,7 +332,9 @@ class MainWindow(QMainWindow):
         if alerts:
             unacknowledged = [a for a in alerts if not a.acknowledged]
             if unacknowledged:
-                self.status_bar.showMessage(f"!! {len(unacknowledged)} new alert(s)")
+                self._set_alert_indicator(len(unacknowledged))
+                return
+        self._set_alert_indicator(0)
 
     def closeEvent(self, event):
         """Evento de fechamento da aplicacao"""

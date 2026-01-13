@@ -12,6 +12,8 @@ import psutil
 from config.config import YOLO_MODEL, APP_VERSION, APP_NAME
 from pathlib import Path
 
+from config.ui_theme import PALETTE, contrast_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -282,10 +284,9 @@ Processes: {len(psutil.pids())}
                 self.cameras_table.setItem(row, 0, QTableWidgetItem(str(camera_id)))
 
                 status_item = QTableWidgetItem(info.get('status', 'unknown'))
-                if info.get('status') == 'online':
-                    status_item.setForeground(QColor(76, 175, 80))
-                else:
-                    status_item.setForeground(QColor(244, 67, 54))
+                status_hex = PALETTE["success"] if info.get('status') == 'online' else PALETTE["danger"]
+                status_item.setBackground(QColor(status_hex))
+                status_item.setForeground(QColor(contrast_text(status_hex)))
                 self.cameras_table.setItem(row, 1, status_item)
 
                 self.cameras_table.setItem(row, 2, QTableWidgetItem(str(info.get('frames_processed', 0))))

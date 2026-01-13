@@ -12,6 +12,8 @@ from PySide6.QtCore import Qt, QDate, QTimer
 from PySide6.QtGui import QFont, QColor, QPixmap
 from pathlib import Path
 
+from config.ui_theme import color_for_status, contrast_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -200,20 +202,20 @@ class AlertsHistoryPage(QWidget):
                     is_real = alert[6]
                     if is_real is None:
                         status_text = "Unreviewed"
-                        status_color = QColor(255, 193, 7)  # Amarelo
                     elif is_real:
                         status_text = "Real"
-                        status_color = QColor(76, 175, 80)  # Verde
                     else:
                         status_text = "False Positive"
-                        status_color = QColor(244, 67, 54)  # Vermelho
 
                     status_item = QTableWidgetItem(status_text)
-                    status_item.setBackground(status_color)
+                    status_hex = color_for_status(status_text)
+                    status_item.setBackground(QColor(status_hex))
+                    status_item.setForeground(QColor(contrast_text(status_hex)))
                     self.alerts_table.setItem(row, 5, status_item)
 
                     # Snapshot
                     snapshot_btn = QPushButton("View")
+                    snapshot_btn.setObjectName("GhostButton")
                     snapshot_path = alert[7]
                     snapshot_btn.clicked.connect(
                         lambda checked, path=snapshot_path: self.view_snapshot(path)
@@ -225,12 +227,14 @@ class AlertsHistoryPage(QWidget):
 
                     if is_real is None:
                         real_btn = QPushButton("Real")
+                        real_btn.setObjectName("SuccessButton")
                         real_btn.clicked.connect(
                             lambda checked, alert_id=alert[0]: self.mark_real(alert_id)
                         )
                         actions_layout.addWidget(real_btn)
 
                         fp_btn = QPushButton("FP")
+                        fp_btn.setObjectName("DangerButton")
                         fp_btn.clicked.connect(
                             lambda checked, alert_id=alert[0]: self.mark_false_positive(alert_id)
                         )

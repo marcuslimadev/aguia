@@ -6,9 +6,14 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox,
     QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox,
-    QTextEdit, QTabWidget, QCheckBox
+    QTextEdit, QTabWidget, QCheckBox, QFileDialog
 )
 from PySide6.QtGui import QFont, QColor
+
+from pathlib import Path
+
+from config.config import APP_DATA_DIR
+from config.ui_theme import color_for_severity, color_for_status, contrast_text
 
 logger = logging.getLogger(__name__)
 
@@ -250,20 +255,21 @@ class AlertsPage(QWidget):
                 self.alerts_table.setItem(row, 1, QTableWidgetItem(alert.event_type))
 
                 severity_item = QTableWidgetItem(alert.severity)
-                severity_colors = {
-                    'low': QColor(255, 204, 0),
-                    'medium': QColor(255, 152, 0),
-                    'high': QColor(212, 0, 0),
-                    'critical': QColor(111, 0, 0)
-                }
-                severity_item.setForeground(severity_colors.get(alert.severity, QColor(0, 91, 187)))
+                severity_hex = color_for_severity(alert.severity)
+                severity_item.setBackground(QColor(severity_hex))
+                severity_item.setForeground(QColor(contrast_text(severity_hex)))
                 self.alerts_table.setItem(row, 2, severity_item)
 
                 self.alerts_table.setItem(row, 3, QTableWidgetItem(alert.timestamp.isoformat()))
                 status = "Acknowledged" if alert.acknowledged else "Active"
-                self.alerts_table.setItem(row, 4, QTableWidgetItem(status))
+                status_item = QTableWidgetItem(status)
+                status_hex = color_for_status(status)
+                status_item.setBackground(QColor(status_hex))
+                status_item.setForeground(QColor(contrast_text(status_hex)))
+                self.alerts_table.setItem(row, 4, status_item)
 
                 ack_btn = QPushButton("Acknowledge")
+                ack_btn.setObjectName("SuccessButton")
                 ack_btn.clicked.connect(lambda checked, aid=alert.alert_id: self.acknowledge_alert(aid))
                 self.alerts_table.setCellWidget(row, 5, ack_btn)
 
@@ -361,9 +367,20 @@ class SettingsPage(QWidget):
         layout = QVBoxLayout()
 
         layout.addWidget(QLabel("System Configuration:"))
-        layout.addWidget(QLabel("- Application Data: C:/ProgramData/EdgeAI"))
-        layout.addWidget(QLabel("- Database: SQLite"))
-        layout.addWidget(QLabel("- AI Model: YOLOv8"))
+        layout.addWidget(QLabel("Application Data Location:"))
+
+        data_layout = QHBoxLayout()
+        self.data_dir = QLineEdit()
+        self.data_dir.setReadOnly(True)
+        self.data_dir.setText(str(APP_DATA_DIR))
+        data_layout.addWidget(self.data_dir)
+
+        browse_btn = QPushButton("Browse")
+        browse_btn.clicked.connect(self.browse_data_dir)
+        data_layout.addWidget(browse_btn)
+        layout.addLayout(data_layout)
+
+        layout.addWidget(QLabel("Restart required to apply data directory changes."))
 
         layout.addWidget(QLabel("Runtime Behavior:"))
         self.enable_tray_checkbox = QCheckBox("Run in background (tray)")
@@ -457,6 +474,20 @@ class SettingsPage(QWidget):
         enable_tray = self.enable_tray_checkbox.isChecked()
         silent_mode = self.silent_mode_checkbox.isChecked()
         auto_start = self.auto_start_engine_checkbox.isChecked()
+        data_dir_changed = False
+
+        current_data_dir = self.app_settings.get("data_dir", str(APP_DATA_DIR))
+        new_data_dir = self.data_dir.text().strip()
+        if not new_data_dir:
+            new_data_dir = current_data_dir
+        if new_data_dir != current_data_dir:
+            try:
+                Path(new_data_dir).mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to create data directory: {e}")
+                return
+            self.app_settings.set("data_dir", new_data_dir)
+            data_dir_changed = True
 
         if silent_mode and not enable_tray:
             silent_mode = False
@@ -468,11 +499,26 @@ class SettingsPage(QWidget):
         self.app_settings.set("auto_start_engine", auto_start)
         self.app_settings.save()
 
+        if data_dir_changed:
+            message = "System settings saved. Restart required to apply data directory changes."
+        else:
+            message = "System settings saved. Restart may be required to apply changes."
+
         QMessageBox.information(
             self,
             "Success",
-            "System settings saved. Restart may be required to apply changes."
+            message
         )
+
+    def browse_data_dir(self):
+        current = self.data_dir.text().strip() or str(APP_DATA_DIR)
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "Select Data Directory",
+            current
+        )
+        if selected:
+            self.data_dir.setText(selected)
 
     def open_store(self):
         import webbrowser
@@ -483,6 +529,9 @@ class SettingsPage(QWidget):
             self.enable_tray_checkbox.setChecked(self.app_settings.get("enable_tray", True))
             self.silent_mode_checkbox.setChecked(self.app_settings.get("silent_mode", False))
             self.auto_start_engine_checkbox.setChecked(self.app_settings.get("auto_start_engine", True))
+            if hasattr(self, "data_dir"):
+                current_data_dir = self.app_settings.get("data_dir", str(APP_DATA_DIR))
+                self.data_dir.setText(str(current_data_dir))
 
         if hasattr(self, "smtp_server"):
             self.smtp_server.setText(self.app_settings.get("smtp_server", ""))

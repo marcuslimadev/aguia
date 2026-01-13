@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Qt, Signal, QObject
 
+from config.ui_theme import PALETTE
+
 logger = logging.getLogger(__name__)
 
 
@@ -131,10 +133,10 @@ class TrayApp:
         from PySide6.QtGui import QPixmap, QColor, QPainter
 
         pixmap = QPixmap(64, 64)
-        pixmap.fill(QColor(33, 150, 243))
+        pixmap.fill(QColor(PALETTE["accent"]))
 
         painter = QPainter(pixmap)
-        painter.setPen(QColor(255, 255, 255))
+        painter.setPen(QColor(PALETTE["accent_text"]))
         painter.setFont(painter.font())
         painter.drawText(pixmap.rect(), Qt.AlignCenter, "AI")
         painter.end()

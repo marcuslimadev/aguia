@@ -1,18 +1,56 @@
 """
 Configurações centralizadas do Edge Property Security AI
 """
+import json
 import os
 from pathlib import Path
 from typing import Dict
 
-# Diretórios
-if os.name == 'nt':  # Windows
-    APP_DATA_DIR = Path("C:/ProgramData/EdgeAI")
+# Diret�rios
+if os.name == "nt":  # Windows
+    _local_appdata = os.environ.get("LOCALAPPDATA")
+    if _local_appdata:
+        APP_CONFIG_DIR = Path(_local_appdata) / "EdgeAI"
+    else:
+        APP_CONFIG_DIR = Path.home() / "AppData/Local/EdgeAI"
 else:  # Linux/Mac para desenvolvimento
-    APP_DATA_DIR = Path.home() / ".EdgeAI"
+    APP_CONFIG_DIR = Path.home() / ".edgeai"
 
-APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    APP_CONFIG_DIR = Path.home() / ".EdgeAI"
+    APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+DEFAULT_APP_DATA_DIR = APP_CONFIG_DIR
 
+
+def _load_data_dir_from_settings() -> Path:
+    settings_path = APP_CONFIG_DIR / "settings.json"
+    if not settings_path.exists():
+        return DEFAULT_APP_DATA_DIR
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except Exception:
+        return DEFAULT_APP_DATA_DIR
+    data_dir = str(data.get("data_dir", "")).strip()
+    if not data_dir:
+        return DEFAULT_APP_DATA_DIR
+    candidate = Path(data_dir).expanduser()
+    if not candidate.is_absolute():
+        candidate = APP_CONFIG_DIR / candidate
+    return candidate
+
+
+if os.environ.get("EDGEAI_DATA_DIR"):
+    APP_DATA_DIR = Path(os.environ["EDGEAI_DATA_DIR"]).expanduser()
+else:
+    APP_DATA_DIR = _load_data_dir_from_settings()
+
+try:
+    APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    APP_DATA_DIR = APP_CONFIG_DIR
+    APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = APP_DATA_DIR / "database.db"
 SNAPSHOTS_DIR = APP_DATA_DIR / "snapshots"
 LOGS_DIR = APP_DATA_DIR / "logs"

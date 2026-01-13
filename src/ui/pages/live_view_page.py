@@ -6,10 +6,12 @@ from typing import Optional
 
 import cv2
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QImage, QPixmap, QColor
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QFrame, QGraphicsDropShadowEffect
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QFrame
 )
+
+from config.ui_theme import PALETTE
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +41,6 @@ class LiveViewPage(QWidget):
 
         header_frame = QFrame()
         header_frame.setObjectName("LiveViewHeader")
-        header_shadow = QGraphicsDropShadowEffect(self)
-        header_shadow.setBlurRadius(18)
-        header_shadow.setOffset(0, 3)
-        header_shadow.setColor(QColor("#cecece"))
-        header_frame.setGraphicsEffect(header_shadow)
         header_layout = QHBoxLayout()
         header_layout.addWidget(QLabel("Camera:"))
         self.camera_selector = QComboBox()
@@ -68,12 +65,9 @@ class LiveViewPage(QWidget):
         self.video_label = QLabel("No camera selected")
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setMinimumHeight(420)
-        self.video_label.setStyleSheet("background-color: #ffffff;")
-        video_shadow = QGraphicsDropShadowEffect(self)
-        video_shadow.setBlurRadius(18)
-        video_shadow.setOffset(0, 3)
-        video_shadow.setColor(QColor("#cecece"))
-        self.video_label.setGraphicsEffect(video_shadow)
+        self.video_label.setStyleSheet(
+            f"background-color: {PALETTE['surface_alt']}; border: 1px solid {PALETTE['border']};"
+        )
         main_layout.addWidget(self.video_label, 1)
 
         self.status_label = QLabel("Ready")
@@ -158,11 +152,11 @@ class LiveViewPage(QWidget):
         self._last_frame_id = frame.frame_id
 
         draw = frame.raw_frame.copy()
+        default_color = self._hex_to_bgr(PALETTE["accent"])
+        alert_color = self._hex_to_bgr(PALETTE["danger"])
         for det in frame.detections:
             x1, y1, x2, y2 = det.bbox
-            color = (0, 91, 187)  # blue
-            if det.class_name == "person":
-                color = (212, 0, 0)  # red
+            color = alert_color if det.class_name == "person" else default_color
             cv2.rectangle(draw, (x1, y1), (x2, y2), color, 2)
             label = f"{det.class_name} {det.confidence:.2f}"
             cv2.putText(draw, label, (x1, max(y1 - 6, 10)),
@@ -187,3 +181,13 @@ class LiveViewPage(QWidget):
         super().hideEvent(event)
         if self.update_timer.isActive():
             self.update_timer.stop()
+
+    @staticmethod
+    def _hex_to_bgr(hex_color: str) -> tuple[int, int, int]:
+        hex_color = hex_color.lstrip("#")
+        if len(hex_color) != 6:
+            return (0, 0, 0)
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (b, g, r)
