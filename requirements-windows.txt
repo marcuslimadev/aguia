@@ -1,0 +1,42 @@
+# Requisitos para build em Windows
+# Instale com: pip install -r requirements-windows.txt
+
+# Interface Gráfica
+PySide6==6.6.1
+
+# Processamento de Vídeo
+opencv-python==4.8.1.78
+numpy==1.24.3
+
+# IA e Machine Learning (ONNX Runtime - sem Torch em runtime)
+onnxruntime==1.16.3
+onnxruntime-gpu==1.16.3  # Opcional: para GPU CUDA
+
+# Processamento de Imagem
+Pillow==10.1.0
+
+# Networking
+requests==2.31.0
+
+# Configuração
+python-dotenv==1.0.0
+
+# Build e Packaging
+nuitka==1.8.4
+pyinstaller==6.1.0
+
+# Monitoramento de Sistema
+psutil==5.9.5
+
+# Windows específico
+pywin32==305  # Para integração com Windows
+winsdk==1.0.0  # Para Windows.Services.Store
+
+# Desenvolvimento e Testes
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.12.0
+pylint==3.0.3
+
+# NOTA: Torch e Ultralytics removidos da runtime
+# Usar apenas para treinamento/export de modelos ONNX

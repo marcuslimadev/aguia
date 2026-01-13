@@ -1,0 +1,72 @@
+{
+  "ui": {
+    "button": {
+      "ok": "Aceptar",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "delete": "Eliminar",
+      "edit": "Editar",
+      "add": "Añadir",
+      "refresh": "Actualizar",
+      "export": "Exportar",
+      "import": "Importar",
+      "close": "Cerrar"
+    },
+    "menu": {
+      "file": "Archivo",
+      "edit": "Editar",
+      "view": "Ver",
+      "help": "Ayuda",
+      "settings": "Configuración",
+      "exit": "Salir"
+    },
+    "label": {
+      "username": "Usuario",
+      "password": "Contraseña",
+      "email": "Correo",
+      "camera": "Cámara",
+      "zone": "Zona",
+      "alert": "Alerta",
+      "timestamp": "Fecha/Hora",
+      "status": "Estado",
+      "confidence": "Confianza"
+    }
+  },
+  "messages": {
+    "success": "Operación completada con éxito",
+    "error": "Ocurrió un error",
+    "warning": "Advertencia",
+    "info": "Información",
+    "confirm": "¿Estás seguro?",
+    "loading": "Cargando...",
+    "saving": "Guardando...",
+    "deleting": "Eliminando..."
+  },
+  "errors": {
+    "connection_failed": "Falha de conexión",
+    "invalid_credentials": "Credenciales inválidas",
+    "camera_offline": "Cámara desconectada",
+    "no_cameras": "Ninguna cámara configurada",
+    "invalid_input": "Entrada inválida",
+    "database_error": "Error en la base de datos"
+  },
+  "alerts": {
+    "intrusion": "Intrusión Detectada",
+    "loitering": "Permanencia Prolongada",
+    "theft": "Robo Detectado",
+    "crowd_anomaly": "Anomalía de Multitud",
+    "fire_smoke": "Fuego/Humo Detectado",
+    "vandalism": "Vandalismo Detectado"
+  },
+  "pages": {
+    "login": "Iniciar Sesión",
+    "dashboard": "Panel",
+    "cameras": "Cámaras",
+    "zones": "Zonas",
+    "alerts": "Alertas",
+    "history": "Historial",
+    "feedback": "Retroalimentación",
+    "diagnostics": "Diagnósticos",
+    "settings": "Configuración"
+  }
+}

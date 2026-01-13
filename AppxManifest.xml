@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10">
+
+  <Identity Name="EdgePropertySecurityAI"
+            Publisher="CN=EdgeSecurity"
+            Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>Edge Property Security AI</DisplayName>
+    <PublisherDisplayName>Edge Security</PublisherDisplayName>
+    <Logo>assets\logo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="pt-br" />
+  </Resources>
+
+  <Applications>
+    <Application Id="EdgePropertySecurityAI" Executable="main.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Edge Property Security AI"
+                          Square150x150Logo="assets\tile_150x150.png"
+                          Square44x44Logo="assets\icon_44x44.png"
+                          Description="Professional property security with AI-powered video analysis"
+                          BackgroundColor="#2196F3">
+        <uap:SplashScreen Image="assets\splash.png" />
+      </uap:VisualElements>
+
+      <!-- Desktop Bridge para aplicação full-trust -->
+      <desktop:Extension Category="windows.fullTrustProcess" EntryPoint="EdgePropertySecurityAI.App" />
+
+      <!-- Startup Task para auto-iniciar -->
+      <uap:Extension Category="windows.startupTask" Executable="main.exe" EntryPoint="Windows.FullTrustApplication">
+        <uap:StartupTask TaskId="EdgePropertySecurityAIStartup" Enabled="true" DisplayName="Edge Property Security AI" />
+      </uap:Extension>
+
+      <!-- Notificações de toast -->
+      <uap:Extension Category="windows.toastNotificationActivation">
+        <uap:ToastNotificationActivation />
+      </uap:Extension>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- ONLY internetClient for RTSP streams and SMTP email -->
+    <Capability Name="internetClient" />
+    
+    <!-- NO webcam (we access IP cameras via RTSP, not local webcam) -->
+    <!-- NO documentsLibrary (we use ProgramData, not user docs) -->
+    <!-- NO picturesLibrary (snapshots go to ProgramData) -->
+  </Capabilities>
+
+</Package>

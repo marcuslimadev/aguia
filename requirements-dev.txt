@@ -1,0 +1,24 @@
+# Dependências de desenvolvimento apenas
+# Usado para exportar modelos, treinar, e desenvolvimento
+# NÃO incluir em produção/runtime
+
+# YOLO training e export
+torch==2.1.1
+ultralytics==8.0.228
+
+# ONNX tools
+onnx==1.14.1
+onnx-simplifier==0.4.33
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+
+# Code quality
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Build tools
+nuitka==1.8.4

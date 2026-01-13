@@ -1,0 +1,72 @@
+{
+  "ui": {
+    "button": {
+      "ok": "OK",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "delete": "Löschen",
+      "edit": "Bearbeiten",
+      "add": "Hinzufügen",
+      "refresh": "Aktualisieren",
+      "export": "Exportieren",
+      "import": "Importieren",
+      "close": "Schließen"
+    },
+    "menu": {
+      "file": "Datei",
+      "edit": "Bearbeiten",
+      "view": "Ansicht",
+      "help": "Hilfe",
+      "settings": "Einstellungen",
+      "exit": "Beenden"
+    },
+    "label": {
+      "username": "Benutzername",
+      "password": "Passwort",
+      "email": "E-Mail",
+      "camera": "Kamera",
+      "zone": "Zone",
+      "alert": "Warnung",
+      "timestamp": "Datum/Uhrzeit",
+      "status": "Status",
+      "confidence": "Konfidenz"
+    }
+  },
+  "messages": {
+    "success": "Operation erfolgreich abgeschlossen",
+    "error": "Ein Fehler ist aufgetreten",
+    "warning": "Warnung",
+    "info": "Information",
+    "confirm": "Bist du sicher?",
+    "loading": "Wird geladen...",
+    "saving": "Wird gespeichert...",
+    "deleting": "Wird gelöscht..."
+  },
+  "errors": {
+    "connection_failed": "Verbindungsfehler",
+    "invalid_credentials": "Ungültige Anmeldedaten",
+    "camera_offline": "Kamera offline",
+    "no_cameras": "Keine Kameras konfiguriert",
+    "invalid_input": "Ungültige Eingabe",
+    "database_error": "Datenbankfehler"
+  },
+  "alerts": {
+    "intrusion": "Eindringen erkannt",
+    "loitering": "Längerer Aufenthalt",
+    "theft": "Diebstahl erkannt",
+    "crowd_anomaly": "Menschenmenge-Anomalie",
+    "fire_smoke": "Feuer/Rauch erkannt",
+    "vandalism": "Vandalismus erkannt"
+  },
+  "pages": {
+    "login": "Anmelden",
+    "dashboard": "Dashboard",
+    "cameras": "Kameras",
+    "zones": "Zonen",
+    "alerts": "Warnungen",
+    "history": "Verlauf",
+    "feedback": "Rückmeldung",
+    "diagnostics": "Diagnose",
+    "settings": "Einstellungen"
+  }
+}

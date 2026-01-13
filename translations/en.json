@@ -1,0 +1,72 @@
+{
+  "ui": {
+    "button": {
+      "ok": "OK",
+      "cancel": "Cancel",
+      "save": "Save",
+      "delete": "Delete",
+      "edit": "Edit",
+      "add": "Add",
+      "refresh": "Refresh",
+      "export": "Export",
+      "import": "Import",
+      "close": "Close"
+    },
+    "menu": {
+      "file": "File",
+      "edit": "Edit",
+      "view": "View",
+      "help": "Help",
+      "settings": "Settings",
+      "exit": "Exit"
+    },
+    "label": {
+      "username": "Username",
+      "password": "Password",
+      "email": "Email",
+      "camera": "Camera",
+      "zone": "Zone",
+      "alert": "Alert",
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "confidence": "Confidence"
+    }
+  },
+  "messages": {
+    "success": "Operation completed successfully",
+    "error": "An error occurred",
+    "warning": "Warning",
+    "info": "Information",
+    "confirm": "Are you sure?",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "deleting": "Deleting..."
+  },
+  "errors": {
+    "connection_failed": "Connection failed",
+    "invalid_credentials": "Invalid credentials",
+    "camera_offline": "Camera is offline",
+    "no_cameras": "No cameras configured",
+    "invalid_input": "Invalid input",
+    "database_error": "Database error"
+  },
+  "alerts": {
+    "intrusion": "Intrusion Detected",
+    "loitering": "Loitering Detected",
+    "theft": "Theft Detected",
+    "crowd_anomaly": "Crowd Anomaly",
+    "fire_smoke": "Fire/Smoke Detected",
+    "vandalism": "Vandalism Detected"
+  },
+  "pages": {
+    "login": "Login",
+    "dashboard": "Dashboard",
+    "cameras": "Cameras",
+    "zones": "Zones",
+    "alerts": "Alerts",
+    "history": "History",
+    "feedback": "Feedback",
+    "diagnostics": "Diagnostics",
+    "settings": "Settings"
+  }
+}
