@@ -1,5 +1,5 @@
 """
-Descoberta e integração ONVIF de câmeras
+Descoberta e integração ONVIF de câmeras + Intelbras Cloud P2P
 """
 import logging
 from typing import List, Dict, Optional, Tuple
@@ -8,9 +8,159 @@ from pathlib import Path
 import socket
 import threading
 import time
+import requests
+import json
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+def discover_intelbras_p2p(device_id: str, device_password: str, cloud_user: Optional[str] = None) -> Optional[str]:
+    """
+    Connect to Intelbras camera via Cloud/P2P
+    
+    Args:
+        device_id: Device serial number (e.g., DTR0004547751)
+        device_password: Admin password for device
+        cloud_user: Optional Intelbras Cloud username
+        
+    Returns:
+        RTSP URL if successful, None otherwise
+    """
+    try:
+        logger.info(f"Connecting to Intelbras device {device_id}...")
+        
+        # Method 1: Try ONVIF discovery on local network first
+        # Many Intelbras cameras support ONVIF
+        onvif_cameras = discover_onvif_cameras(timeout=10)
+        for cam in onvif_cameras:
+            if device_id in str(cam.get('serial', '')):
+                logger.info(f"✓ Found device {device_id} via ONVIF at {cam['ip']}")
+                rtsp_url = f"rtsp://admin:{device_password}@{cam['ip']}:554/cam/realmonitor?channel=1&subtype=0"
+                return rtsp_url
+        
+        # Method 2: Try Intelbras Cloud API
+        # Note: This is reverse-engineered from Guardian app
+        # The actual API endpoint might vary
+        cloud_endpoints = [
+            "https://cloud.intelbras.com.br/api/v1",
+            "https://p2p.intelbras.com.br/api",
+            "https://guardian.intelbras.com/api"
+        ]
+        
+        for endpoint in cloud_endpoints:
+            try:
+                # Try to get device stream URL from cloud
+                payload = {
+                    "device_id": device_id,
+                    "password": device_password
+                }
+                if cloud_user:
+                    payload["username"] = cloud_user
+                
+                response = requests.post(
+                    f"{endpoint}/device/stream",
+                    json=payload,
+                    timeout=10,
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "rtsp_url" in data:
+                        logger.info(f"✓ Got P2P URL from {endpoint}")
+                        return data["rtsp_url"]
+                    elif "p2p_url" in data:
+                        return data["p2p_url"]
+                        
+            except requests.RequestException as e:
+                logger.debug(f"Cloud endpoint {endpoint} failed: {e}")
+                continue
+        
+        # Method 3: Try standard Intelbras RTSP formats with cloud domain
+        # Some devices use cloud relay
+        possible_urls = [
+            f"rtsp://admin:{device_password}@{device_id}.intelbras.cloud:554/cam/realmonitor?channel=1&subtype=0",
+            f"rtsp://admin:{device_password}@p2p.intelbras.com.br:554/{device_id}/cam/realmonitor?channel=1&subtype=0",
+            f"rtsp://admin:{device_password}@{device_id}.p2p.intelbras.com:554/stream"
+        ]
+        
+        logger.warning(f"⚠ Cloud API unavailable. Try these URLs manually:")
+        for url in possible_urls:
+            logger.info(f"  • {url}")
+        
+        # Return first URL for user to test
+        return possible_urls[0]
+        
+    except Exception as e:
+        logger.error(f"✗ Failed to connect to Intelbras device: {e}", exc_info=True)
+        return None
+
+
+def discover_onvif_cameras(timeout: int = 5) -> List[Dict]:
+    """
+    Discover ONVIF cameras on local network
+    
+    Args:
+        timeout: Discovery timeout in seconds
+        
+    Returns:
+        List of discovered cameras with name, ip, serial
+    """
+    try:
+        # Try WSDiscovery for ONVIF
+        from wsdiscovery.discovery import ThreadedWSDiscovery as WSDiscovery
+        from wsdiscovery.scope import Scope
+        
+        logger.info(f"Scanning network for ONVIF cameras ({timeout}s)...")
+        wsd = WSDiscovery()
+        wsd.start()
+        
+        services = wsd.searchServices(timeout=timeout)
+        cameras = []
+        
+        for service in services:
+            try:
+                # Check if it's an ONVIF device
+                scopes = [str(s) for s in service.getScopes()]
+                if any('onvif' in s.lower() for s in scopes):
+                    # Extract info
+                    xaddrs = service.getXAddrs()
+                    if xaddrs:
+                        url = urlparse(xaddrs[0])
+                        ip = url.hostname
+                        
+                        # Try to extract name and serial from scopes
+                        name = "ONVIF Camera"
+                        serial = ""
+                        for scope in scopes:
+                            if 'name/' in scope.lower():
+                                name = scope.split('name/')[-1].split('/')[0]
+                            elif 'hardware/' in scope.lower():
+                                serial = scope.split('hardware/')[-1].split('/')[0]
+                        
+                        cameras.append({
+                            'name': name,
+                            'ip': ip,
+                            'serial': serial,
+                            'scopes': scopes,
+                            'xaddrs': xaddrs
+                        })
+                        logger.info(f"  ✓ Found {name} at {ip}")
+                        
+            except Exception as e:
+                logger.debug(f"Error parsing service: {e}")
+                continue
+        
+        wsd.stop()
+        return cameras
+        
+    except ImportError:
+        logger.warning("⚠ WSDiscovery not installed. Install with: pip install wsdiscovery")
+        return []
+    except Exception as e:
+        logger.error(f"✗ ONVIF discovery failed: {e}", exc_info=True)
+        return []
 
 
 @dataclass

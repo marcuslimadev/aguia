@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Configurações centralizadas do Edge Property Security AI
 """
@@ -6,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Dict
 
-# Diret�rios
+# Diret�rios
 if os.name == "nt":  # Windows
     _local_appdata = os.environ.get("LOCALAPPDATA")
     if _local_appdata:
@@ -78,7 +79,7 @@ IS_STORE_BUILD = False  # True quando empacotado como MSIX para Store
 
 # IA e Processamento
 YOLO_MODEL = "yolov8m.pt"  # Medium model
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0.4  # Lower for better shoplifting detection
 IOU_THRESHOLD = 0.45
 FRAME_SKIP = 2  # Processar a cada 2 frames
 
@@ -89,13 +90,13 @@ MAX_FRAME_WIDTH = 1920
 MAX_FRAME_HEIGHT = 1080
 
 # Alertas
-ALERT_COOLDOWN = 30  # segundos entre alertas do mesmo tipo
+ALERT_COOLDOWN = 15  # segundos entre alertas (reduzido para shoplifting)
 MAX_SNAPSHOTS_PER_ALERT = 3
 SNAPSHOT_QUALITY = 85
 
 # Event Engine - Temporal Event Detection
-INTRUSION_DWELL_TIME = 3  # segundos mínimos em zona proibida
-LOITERING_THRESHOLD = 60  # segundos para considerar loitering
+INTRUSION_DWELL_TIME = 2  # segundos mínimos em zona proibida (mais rápido)
+LOITERING_THRESHOLD = 45  # segundos para considerar loitering (mais sensível)
 LOITERING_MOVEMENT_THRESHOLD = 100  # pixels de movimento mínimo
 THEFT_DETECTION_FRAMES = 10  # frames para detectar padrão de roubo
 CROWD_THRESHOLD = 10  # número de pessoas para anomalia de multidão
@@ -111,7 +112,7 @@ POSE_MIN_TRACKING_CONFIDENCE = 0.5  # threshold de tracking
 SHOPLIFTING_ENABLED = True  # habilitar detecção de shoplifting
 SHOPLIFTING_SEQUENCE_LENGTH = 24  # frames por sequência (Shopformer usa 24)
 SHOPLIFTING_SEQUENCE_STRIDE = 12  # step entre sequências
-SHOPLIFTING_ANOMALY_THRESHOLD = 0.7  # threshold para considerar shoplifting
+SHOPLIFTING_ANOMALY_THRESHOLD = 0.6  # threshold para considerar shoplifting (mais sensível)
 SHOPLIFTING_MODEL_PATH = None  # caminho para modelo ONNX (None = heurísticas)
 SHOPLIFTING_USE_ONNX = False  # usar ONNX ou heurísticas (default: heurísticas)
 
@@ -146,6 +147,24 @@ DETECTION_CLASSES = {
     "handbag": 26,
     "suitcase": 28,
 }
+
+# Shoplifting - Classes suspeitas (objetos que podem indicar furto)
+SUSPICIOUS_CLASSES = [
+    "person",      # Pessoa (sempre monitorar)
+    "backpack",    # Mochila (pode esconder itens)
+    "handbag",     # Bolsa (pode esconder itens)
+    "suitcase",    # Mala (pode esconder muitos itens)
+    "knife",       # Faca (arma)
+    "scissors",    # Tesoura (pode remover etiquetas)
+    "bottle",      # Garrafa (pode ser escondida)
+    "cup",         # Copo (pode esconder itens)
+    "cell phone",  # Celular (pode estar filmando/distraindo)
+]
+
+# Alert levels por classe
+HIGH_RISK_CLASSES = ["knife", "scissors"]  # Alerta imediato
+MEDIUM_RISK_CLASSES = ["backpack", "handbag", "suitcase"]  # Monitorar comportamento
+LOW_RISK_CLASSES = ["bottle", "cup", "cell phone"]  # Apenas registrar
 
 # Tipos de eventos
 EVENT_TYPES = {

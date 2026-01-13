@@ -8,12 +8,13 @@ from typing import Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QPushButton, QLabel, QMessageBox, QStatusBar, QFrame
+    QPushButton, QLabel, QStatusBar, QFrame, QMenuBar, QMenu
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon, QFont
+from PySide6.QtGui import QIcon, QFont, QAction
 
 from config.config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
+from config.bauhaus_theme import get_minimal_black_stylesheet
 from config.ui_theme import get_app_stylesheet
 from src.ui.pages.login_page import LoginPage
 from src.ui.pages.dashboard_page import DashboardPage
@@ -21,6 +22,7 @@ from src.ui.pages.cameras_page import CamerasPage, SettingsPage
 from src.ui.pages.alerts_history_page import AlertsHistoryPage
 from src.ui.pages.diagnostics_page import DiagnosticsPage
 from src.ui.pages.live_view_page import LiveViewPage
+from src.ui.pages.profile_page import ProfilePage
 # from src.ui.pages.zones_page import ZonesPage  # TODO: Implementar
 # from src.ui.pages.settings_page import SettingsPage  # TODO: Implementar
 
@@ -54,9 +56,69 @@ class MainWindow(QMainWindow):
         self.alert_timer.start(5000)  # Verificar a cada 5 segundos
 
         logger.info("Janela principal inicializada")
+    
+    def create_menu_bar(self):
+        """Cria menu bar clássico"""
+        menubar = self.menuBar()
+        
+        # File Menu
+        file_menu = menubar.addMenu("File")
+        
+        exit_action = QAction("Exit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # View Menu
+        view_menu = menubar.addMenu("View")
+        
+        dashboard_action = QAction("Dashboard", self)
+        dashboard_action.triggered.connect(lambda: self.navigate_to("dashboard"))
+        view_menu.addAction(dashboard_action)
+        
+        cameras_action = QAction("Cameras", self)
+        cameras_action.triggered.connect(lambda: self.navigate_to("cameras"))
+        view_menu.addAction(cameras_action)
+        
+        alerts_action = QAction("Alerts", self)
+        alerts_action.triggered.connect(lambda: self.navigate_to("alerts"))
+        view_menu.addAction(alerts_action)
+        
+        view_menu.addSeparator()
+        
+        diagnostics_action = QAction("Diagnostics", self)
+        diagnostics_action.triggered.connect(lambda: self.navigate_to("diagnostics"))
+        view_menu.addAction(diagnostics_action)
+        
+        # Settings Menu
+        settings_menu = menubar.addMenu("Settings")
+        
+        profile_action = QAction("Profile", self)
+        profile_action.triggered.connect(lambda: self.navigate_to("profile"))
+        settings_menu.addAction(profile_action)
+        
+        settings_menu.addSeparator()
+        
+        config_action = QAction("Configuration", self)
+        config_action.triggered.connect(lambda: self.navigate_to("settings"))
+        settings_menu.addAction(config_action)
+        
+        # Help Menu
+        help_menu = menubar.addMenu("Help")
+        
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+    
+    def show_about(self):
+        """Mostra informações sobre o app na barra de status"""
+        self.statusBar().showMessage(f"{APP_NAME} v{APP_VERSION} - AI-powered security monitoring", 5000)
 
     def setup_ui(self):
         """Configura a interface do usuario"""
+        # Menu Bar clássico
+        self.create_menu_bar()
+        
         # Widget central
         central_widget = QWidget()
         central_widget.setObjectName("AppRoot")
@@ -90,6 +152,7 @@ class MainWindow(QMainWindow):
             # ("Zones", "zones"),  # TODO: Implementar
             ("Alerts", "alerts"),
             ("Diagnostics", "diagnostics"),
+            ("Profile", "profile"),
             ("Settings", "settings"),
             ("Logout", "logout"),
         ]
@@ -189,6 +252,13 @@ class MainWindow(QMainWindow):
         )
         self.stacked_widget.addWidget(self.settings_page)
 
+        # Pagina de perfil
+        self.profile_page = ProfilePage(
+            self.db_manager,
+            self.auth_manager
+        )
+        self.stacked_widget.addWidget(self.profile_page)
+
         content_layout.addWidget(self.stacked_widget, 1)
         content_frame.setLayout(content_layout)
         main_layout.addWidget(content_frame, 1)
@@ -208,9 +278,10 @@ class MainWindow(QMainWindow):
         self.tray_app = tray_app
         self._update_engine_status()
 
-    def _update_engine_status(self):
+    def _update_engine_status(self, is_running=None):
         if self.tray_app:
-            self.tray_app.set_engine_status(self.engine_manager.is_running)
+            status = is_running if is_running is not None else self.engine_manager.is_running
+            self.tray_app.set_engine_status(status)
 
     def _prepare_engine_for_user(self):
         user_id = self.auth_manager.get_user_id()
@@ -218,7 +289,8 @@ class MainWindow(QMainWindow):
             return
 
         self.camera_manager.clear_processors()
-        auto_start = self.app_settings.get("auto_start_engine", True)
+        # Desabilitar auto-start - usuário inicia manualmente via "View Live"
+        auto_start = False  # self.app_settings.get("auto_start_engine", True)
         self.camera_manager.load_cameras_for_user(user_id, start_processors=auto_start)
         if auto_start:
             self.engine_manager.start()
@@ -226,7 +298,8 @@ class MainWindow(QMainWindow):
 
     def apply_stylesheet(self):
         """Aplica estilos CSS"""
-        self.setStyleSheet(get_app_stylesheet())
+        # Tema minimalista preto/branco/cinza
+        self.setStyleSheet(get_minimal_black_stylesheet())
 
     def _set_alert_indicator(self, count: int):
         alert_btn = self.nav_buttons.get("alerts")
@@ -298,7 +371,7 @@ class MainWindow(QMainWindow):
             self.page_title.setText("Dashboard")
         elif page_id == "live":
             self.stacked_widget.setCurrentWidget(self.live_view_page)
-            self.live_view_page.refresh()
+            # Don't call refresh() - it's handled by start_stream()
             self.page_title.setText("Live View")
         elif page_id == "cameras":
             self.stacked_widget.setCurrentWidget(self.cameras_page)
@@ -312,6 +385,10 @@ class MainWindow(QMainWindow):
             self.stacked_widget.setCurrentWidget(self.alerts_page)
             self.alerts_page.refresh()
             self.page_title.setText("Alerts")
+        elif page_id == "profile":
+            self.stacked_widget.setCurrentWidget(self.profile_page)
+            self.profile_page.load_profile()
+            self.page_title.setText("Profile")
         elif page_id == "settings":
             self.stacked_widget.setCurrentWidget(self.settings_page)
             self.settings_page.refresh()
@@ -320,6 +397,10 @@ class MainWindow(QMainWindow):
             self.stacked_widget.setCurrentWidget(self.diagnostics_page)
             self.diagnostics_page.refresh_diagnostics()
             self.page_title.setText("Diagnostics")
+    
+    def navigate_to(self, page_id: str):
+        """Alias para navigate_to_page usado pelos menus"""
+        self.navigate_to_page(page_id)
 
         self.status_bar.showMessage(f"Viewing {page_id.capitalize()}")
 
@@ -337,24 +418,15 @@ class MainWindow(QMainWindow):
         self._set_alert_indicator(0)
 
     def closeEvent(self, event):
-        """Evento de fechamento da aplicacao"""
+        """Evento de fechamento da aplicacao - sem confirmação, fecha direto"""
         if self.app_settings.get("enable_tray", True) and not self.allow_close:
             self.hide()
             event.ignore()
             return
 
-        reply = QMessageBox.question(
-            self,
-            "Exit Application",
-            "Are you sure you want to exit?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            self.alert_timer.stop()
-            self.engine_manager.stop()
-            self.camera_manager.clear_processors()
-            logger.info("Aplicacao fechada")
-            event.accept()
-        else:
-            event.ignore()
+        # Fecha direto sem perguntar
+        self.alert_timer.stop()
+        self.engine_manager.stop()
+        self.camera_manager.clear_processors()
+        logger.info("Aplicacao fechada")
+        event.accept()

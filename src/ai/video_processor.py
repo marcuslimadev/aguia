@@ -4,17 +4,22 @@ Processador de vídeo com IA (YOLOv8)
 import cv2
 import numpy as np
 import logging
+import warnings
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import threading
 from queue import Queue
 
+# Suppress ONNX Runtime provider warnings (CUDA not available on CPU-only systems)
+warnings.filterwarnings('ignore', message='.*CUDAExecutionProvider.*')
+
 # Importar RtspReader e EventEngine
 from src.ai.rtsp_reader import RtspReader
 from src.ai.event_engine import EventEngine, EventCandidate
 from src.ai.pose_estimator import PoseEstimator, PoseSequenceBuffer
-from src.ai.shoplifting_detector import ShopliftingDetector
+# ShopliftingDetector temporariamente desabilitado (requer onnxruntime não disponível para Python 3.14)
+# from src.ai.shoplifting_detector import ShopliftingDetector
 from config.config import (
     POSE_MODEL_COMPLEXITY, POSE_MIN_DETECTION_CONFIDENCE,
     SHOPLIFTING_ENABLED, SHOPLIFTING_SEQUENCE_LENGTH, SHOPLIFTING_ANOMALY_THRESHOLD
@@ -183,7 +188,7 @@ class ObjectTracker:
             self.tracker = BYTETracker()
             logger.info("ByteTracker inicializado")
         except ImportError:
-            logger.warning("ByteTrack não está instalado, usando rastreamento simples")
+            logger.debug("ByteTrack not installed - using simple tracking (install with: pip install lap cython-bbox)")
             self.tracker = None
             self.tracks = {}
             self.next_track_id = 0
@@ -295,12 +300,14 @@ class VideoProcessor:
                 sequence_length=SHOPLIFTING_SEQUENCE_LENGTH,
                 stride=12  # stride fixo
             )
-            self.shoplifting_detector = ShopliftingDetector(
-                anomaly_threshold=SHOPLIFTING_ANOMALY_THRESHOLD,
-                model_path=None,  # usar heurísticas por padrão
-                use_onnx=False
-            )
-            logger.info("✓ Shoplifting detection habilitado (modo heurístico)")
+            # ShopliftingDetector temporariamente desabilitado (requer onnxruntime)
+            # self.shoplifting_detector = ShopliftingDetector(
+            #     anomaly_threshold=SHOPLIFTING_ANOMALY_THRESHOLD,
+            #     model_path=None,  # usar heurísticas por padrão
+            #     use_onnx=False
+            # )
+            self.shoplifting_detector = None
+            logger.info("⚠ Shoplifting detection desabilitado (onnxruntime indisponível)")
         else:
             self.pose_estimator = None
             self.pose_buffer = None

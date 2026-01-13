@@ -151,6 +151,20 @@ class DatabaseManager:
             )
         """)
 
+        # Tabela de Verificação de Email
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS email_verification (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                email TEXT NOT NULL,
+                code TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
+                verified BOOLEAN DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
         # Tabela de Eventos Temporais
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS events (
@@ -513,3 +527,81 @@ class DatabaseManager:
             }
         
         return None
+    # Email Verification Methods
+    def create_email_verification(self, user_id: int, email: str, code: str) -> int:
+        """Cria código de verificação para email"""
+        from datetime import datetime, timedelta
+        from config.config import EMAIL_VERIFICATION_TTL_MINUTES
+        
+        expires_at = datetime.now() + timedelta(minutes=EMAIL_VERIFICATION_TTL_MINUTES)
+        
+        query = """
+            INSERT INTO email_verification (user_id, email, code, expires_at)
+            VALUES (?, ?, ?, ?)
+        """
+        return self.execute_update(query, (user_id, email, code, expires_at))
+    
+    def verify_email_code(self, user_id: int, code: str) -> bool:
+        """Verifica código de email e atualiza email do usuário se válido"""
+        from datetime import datetime
+        
+        # Buscar código válido não expirado
+        query = """
+            SELECT id, email FROM email_verification
+            WHERE user_id = ? AND code = ? AND verified = 0
+            AND expires_at > ?
+            ORDER BY created_at DESC LIMIT 1
+        """
+        result = self.execute_query(query, (user_id, code, datetime.now()))
+        
+        if not result:
+            return False
+        
+        verification_id, new_email = result[0][0], result[0][1]
+        
+        # Marcar como verificado
+        update_query = """
+            UPDATE email_verification SET verified = 1
+            WHERE id = ?
+        """
+        self.execute_update(update_query, (verification_id,))
+        
+        # Atualizar email do usuário
+        user_query = """
+            UPDATE users SET email = ?, email_verified = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """
+        self.execute_update(user_query, (new_email, user_id))
+        
+        return True
+    
+    def get_user_email(self, user_id: int) -> Optional[str]:
+        """Retorna email do usuário"""
+        query = "SELECT email FROM users WHERE id = ?"
+        result = self.execute_query(query, (user_id,))
+        return result[0][0] if result else None
+    
+    def update_user_profile(self, user_id: int, **kwargs) -> bool:
+        """Atualiza dados do perfil do usuário (exceto email que precisa verificação)"""
+        allowed_fields = ['username']  # Adicionar outros campos conforme necessário
+        
+        updates = []
+        values = []
+        
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                updates.append(f"{field} = ?")
+                values.append(value)
+        
+        if not updates:
+            return False
+        
+        values.append(user_id)
+        query = f"UPDATE users SET {', '.join(updates)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        
+        try:
+            self.execute_update(query, tuple(values))
+            return True
+        except Exception as e:
+            logger.error(f"Error updating user profile: {e}")
+            return False

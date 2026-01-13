@@ -1,6 +1,10 @@
 # Dependências de runtime (produção)
 # Para desenvolvimento, instalar também: requirements-dev.txt
 
+# ============================================
+# CORE DEPENDENCIES (Required)
+# ============================================
+
 # UI
 PySide6>=6.6.1
 
@@ -9,16 +13,30 @@ opencv-python>=4.8.1.78
 numpy>=1.24.3
 Pillow>=10.1.0
 
-# ONNX Runtime (inferência apenas - SEM Torch)
+# AI/ML Inference
 onnxruntime>=1.16.3
+ultralytics>=8.0.0  # YOLOv8 (downloads models automatically)
 
-# Pose Estimation (para detecção de shoplifting)
-mediapipe>=0.10.9
+# Pose Estimation
+mediapipe>=0.10.30
+
+# Network/HTTP
+requests>=2.31.0
+wsdiscovery>=2.0.0  # ONVIF camera discovery
 
 # Utilities
-requests>=2.31.0
 python-dotenv>=1.0.0
 psutil>=5.9.5
 
-# Nota: torch e ultralytics foram movidos para requirements-dev.txt
-# Eles são necessários APENAS para exportar modelos, não para runtime
+# ============================================
+# OPTIONAL DEPENDENCIES (Improve performance)
+# ============================================
+# Install with: pip install -r requirements-optional.txt
+# OR run: .\install_optional_deps.ps1
+
+# lap>=0.4.0              # ByteTrack advanced tracking
+# cython-bbox>=0.1.3      # ByteTrack dependency
+# torch>=2.0.0            # For model export only (not runtime)
+
+# Note: torch is only needed for ONNX model export
+# Runtime uses onnxruntime (CPU-friendly)

@@ -219,7 +219,7 @@ class AlertManager:
         try:
             email_settings = self.db.get_email_settings(user_id)
             if not email_settings:
-                logger.warning("Configurações de email não encontradas")
+                logger.debug("Email not configured - alerts will be shown in UI only")
                 return False
 
             recipient_emails = email_settings['recipient_emails'].split(',')

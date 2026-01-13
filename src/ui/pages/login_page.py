@@ -3,9 +3,9 @@ Página de login - Padrão Windows
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QMessageBox, QTabWidget, QFrame
+    QPushButton, QTabWidget, QFrame, QProgressBar
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,23 @@ class LoginPage(QWidget):
         subtitle = QLabel("Secure analytics for properties and retail")
         subtitle.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(subtitle)
+        
+        # Status label para feedback inline
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setMinimumHeight(30)
+        self.status_label.hide()
+        card_layout.addWidget(self.status_label)
+        
+        # Progress bar para processos demorados
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(0)  # Indeterminate
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setMaximumHeight(4)
+        self.progress_bar.hide()
+        card_layout.addWidget(self.progress_bar)
 
         card_layout.addSpacing(20)
 
@@ -63,6 +80,16 @@ class LoginPage(QWidget):
 
         self.setLayout(main_layout)
 
+    def show_status(self, message: str, status_type: str = "info", duration: int = 5000):
+        """Show inline status message"""
+        self.status_label.setText(message)
+        self.status_label.setProperty("feedbackType", status_type)
+        self.status_label.setStyleSheet(self.status_label.styleSheet())  # Refresh style
+        self.status_label.show()
+        
+        if duration > 0:
+            QTimer.singleShot(duration, self.status_label.hide)
+    
     def create_login_tab(self):
         """Cria a aba de login"""
         widget = QWidget()
@@ -142,15 +169,27 @@ class LoginPage(QWidget):
         password = self.login_password.text()
 
         if not username or not password:
-            QMessageBox.warning(self, "Missing Fields", "Please enter username and password")
+            self.show_status("✗ Please enter username and password", "error")
             return
-
+        
+        # Mostrar progress bar
+        self.progress_bar.show()
+        self.status_label.hide()
+        
+        # Processar em thread separada (simulando delay)
+        QTimer.singleShot(100, lambda: self._do_login(username, password))
+    
+    def _do_login(self, username, password):
+        """Executa login após pequeno delay para mostrar progress"""
         if self.auth_manager.login(username, password):
             logger.info(f"Login successful: {username}")
-            self.login_successful.emit()
+            self.progress_bar.hide()
+            self.show_status(f"✓ Welcome {username}!", "success", 1000)
+            QTimer.singleShot(1000, self.login_successful.emit)
         else:
             logger.warning(f"Login failed: {username}")
-            QMessageBox.critical(self, "Login Failed", "Invalid username or password")
+            self.progress_bar.hide()
+            self.show_status("✗ Invalid username or password", "error")
 
     def handle_register(self):
         """Processar registro"""
@@ -160,28 +199,38 @@ class LoginPage(QWidget):
         confirm = self.register_confirm.text()
 
         if not username or not password:
-            QMessageBox.warning(self, "Missing Fields", "Username and password are required")
+            self.show_status("✗ Username and password are required", "error")
             return
 
         if len(username) < 3:
-            QMessageBox.warning(self, "Invalid Username", "Username must be at least 3 characters")
+            self.show_status("✗ Username must be at least 3 characters", "error")
             return
 
         if len(password) < 6:
-            QMessageBox.warning(self, "Weak Password", "Password must be at least 6 characters")
+            self.show_status("✗ Password must be at least 6 characters", "error")
             return
 
         if password != confirm:
-            QMessageBox.warning(self, "Password Mismatch", "Passwords do not match")
+            self.show_status("✗ Passwords do not match", "error")
             return
-
+        
+        # Mostrar progress bar
+        self.progress_bar.show()
+        self.status_label.hide()
+        
+        # Processar registro
+        QTimer.singleShot(100, lambda: self._do_register(username, email, password))
+    
+    def _do_register(self, username, email, password):
+        """Executa registro após pequeno delay"""
         try:
             if self.auth_manager.register_user(username, password, email or None):
                 logger.info(f"Registration successful: {username}")
-                QMessageBox.information(
-                    self,
-                    "Account Created",
-                    f"User '{username}' created successfully!\n\nTrial: 7 days | 2 cameras\n\nYou can now login."
+                self.progress_bar.hide()
+                self.show_status(
+                    f"✓ User '{username}' created! Trial: 7 days | 2 cameras. You can now login.",
+                    "success",
+                    7000
                 )
                 
                 self.register_username.clear()
@@ -191,7 +240,9 @@ class LoginPage(QWidget):
                 
         except ValueError as ve:
             logger.error(f"Registration validation error: {ve}")
-            QMessageBox.critical(self, "Registration Error", str(ve))
+            self.progress_bar.hide()
+            self.show_status(f"✗ {str(ve)}", "error")
         except Exception as e:
             logger.error(f"Registration error: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to create account: {str(e)}")
+            self.progress_bar.hide()
+            self.show_status(f"✗ Failed to create account: {str(e)}", "error")

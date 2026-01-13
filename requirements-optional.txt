@@ -1,0 +1,23 @@
+# Optional Dependencies for Enhanced Performance
+# These are NOT required but improve functionality
+
+# ============================================
+# Advanced Object Tracking (ByteTrack)
+# ============================================
+# Improves multi-object tracking accuracy
+# Without this: Simple tracking is used (works fine)
+lap>=0.4.0
+cython-bbox>=0.1.3
+
+# ============================================
+# Model Development/Export (Not for runtime)
+# ============================================
+# Only needed if you want to export custom YOLO models
+# Runtime uses pre-exported ONNX models
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# ============================================
+# Additional Features
+# ============================================
+# python-onvif-zeep>=0.2.12  # Advanced ONVIF features (camera PTZ control)

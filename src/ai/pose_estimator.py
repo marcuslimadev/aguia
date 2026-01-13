@@ -2,6 +2,7 @@
 Pose Estimation usando MediaPipe para análise de comportamento
 """
 import logging
+import os
 import numpy as np
 from typing import List, Tuple, Optional
 import cv2
@@ -41,19 +42,37 @@ class PoseEstimator:
         """Inicializa MediaPipe Pose"""
         try:
             import mediapipe as mp
+            from mediapipe.tasks import python
+            from mediapipe.tasks.python import vision
             
-            self.mp_pose = mp.solutions.pose
-            self.pose_detector = self.mp_pose.Pose(
-                model_complexity=self.model_complexity,
-                min_detection_confidence=self.min_detection_confidence,
-                min_tracking_confidence=0.5,
-                static_image_mode=False  # False para video
+            # MediaPipe 0.10.30+ usa nova API com tasks
+            logger.info("Initializing MediaPipe Pose (new API)...")
+            
+            # Download model if needed
+            model_path = "pose_landmarker_lite.task"
+            if not os.path.exists(model_path):
+                logger.warning("MediaPipe pose model not found - pose detection disabled")
+                logger.info("Download from: https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task")
+                self.pose_detector = None
+                return
+            
+            base_options = python.BaseOptions(model_asset_path=model_path)
+            options = vision.PoseLandmarkerOptions(
+                base_options=base_options,
+                output_segmentation_masks=False,
+                min_pose_detection_confidence=self.min_detection_confidence,
+                min_tracking_confidence=0.5
             )
+            self.pose_detector = vision.PoseLandmarker.create_from_options(options)
             
-            logger.info("✓ MediaPipe Pose initialized")
+            logger.info("✓ MediaPipe Pose initialized (new API)")
             
         except ImportError:
-            logger.error("MediaPipe não instalado. Execute: pip install mediapipe")
+            logger.warning("MediaPipe não instalado - pose detection desabilitado")
+            self.pose_detector = None
+        except Exception as e:
+            logger.warning(f"MediaPipe pose detection não disponível: {e}")
+            logger.info("Pose detection desabilitado - sistema funciona sem ele")
             self.pose_detector = None
 
     def detect_poses(self, frame: np.ndarray, person_bboxes: List[Tuple[int, int, int, int]] = None) -> List[np.ndarray]:

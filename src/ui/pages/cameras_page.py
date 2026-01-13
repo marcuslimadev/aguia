@@ -5,10 +5,13 @@ import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox,
-    QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox,
-    QTextEdit, QTabWidget, QCheckBox, QFileDialog
+    QPushButton, QTableWidget, QTableWidgetItem, QComboBox,
+    QTextEdit, QTabWidget, QCheckBox, QFileDialog, QApplication, QDialog
 )
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont, QColor, QImage, QPixmap
+from PySide6.QtCore import QTimer, QThread, Signal, Qt
+import cv2
+import numpy as np
 
 from pathlib import Path
 
@@ -16,6 +19,200 @@ from config.config import APP_DATA_DIR
 from config.ui_theme import color_for_severity, color_for_status, contrast_text
 
 logger = logging.getLogger(__name__)
+
+
+class VideoThread(QThread):
+    """Thread para capturar frames de vídeo RTSP com detecção YOLO"""
+    frame_ready = Signal(np.ndarray, list)  # frame, detections
+    error_occurred = Signal(str)
+    
+    def __init__(self, rtsp_url):
+        super().__init__()
+        self.rtsp_url = rtsp_url
+        self.running = True
+        self.detector = None
+        
+    def run(self):
+        # Inicializar detector YOLO
+        try:
+            from ultralytics import YOLO
+            self.detector = YOLO("yolov8m.pt")
+            logger.info("✓ YOLO detector initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize YOLO: {e}")
+            self.detector = None
+        
+        cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
+        if not cap.isOpened():
+            self.error_occurred.emit("Failed to open stream")
+            return
+        
+        # Classes suspeitas para alertar
+        suspicious_classes = ["person", "knife", "scissors", "backpack", "handbag", "suitcase"]
+        
+        while self.running:
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                detections = []
+                
+                # Processar com YOLO
+                if self.detector:
+                    try:
+                        results = self.detector(frame, conf=0.4, verbose=False)
+                        for result in results:
+                            for box in result.boxes:
+                                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                conf = float(box.conf[0])
+                                class_id = int(box.cls[0])
+                                class_name = result.names[class_id]
+                                
+                                detections.append({
+                                    'bbox': (x1, y1, x2, y2),
+                                    'class': class_name,
+                                    'conf': conf,
+                                    'suspicious': class_name in suspicious_classes
+                                })
+                    except Exception as e:
+                        logger.error(f"Detection error: {e}")
+                
+                self.frame_ready.emit(frame, detections)
+            else:
+                self.error_occurred.emit("Lost connection")
+                break
+            
+            self.msleep(30)  # ~30 FPS
+        
+        cap.release()
+    
+    def stop(self):
+        self.running = False
+        self.wait()
+
+
+class LiveViewDialog(QDialog):
+    """Janela para visualização ao vivo"""
+    
+    def __init__(self, rtsp_url, camera_name, parent=None):
+        super().__init__(parent)
+        self.rtsp_url = rtsp_url
+        self.camera_name = camera_name
+        self.video_thread = None
+        self.setup_ui()
+        self.start_stream()
+    
+    def setup_ui(self):
+        self.setWindowTitle(f"Live View - {self.camera_name}")
+        self.setMinimumSize(1024, 768)
+        
+        layout = QVBoxLayout()
+        
+        # Label para exibir vídeo
+        self.video_label = QLabel("Loading stream...")
+        self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.video_label.setMinimumSize(800, 600)
+        self.video_label.setStyleSheet("background-color: #000000; color: #ffffff;")
+        layout.addWidget(self.video_label)
+        
+        # Status e alertas
+        status_layout = QHBoxLayout()
+        
+        self.status_label = QLabel(f"Connecting to {self.rtsp_url}...")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        status_layout.addWidget(self.status_label)
+        
+        self.alert_label = QLabel("")
+        self.alert_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.alert_label.setStyleSheet("color: #ff0000; font-weight: bold;")
+        status_layout.addWidget(self.alert_label)
+        
+        layout.addLayout(status_layout)
+        
+        # Botão Close
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+    
+    def start_stream(self):
+        """Inicia thread de captura"""
+        self.video_thread = VideoThread(self.rtsp_url)
+        self.video_thread.frame_ready.connect(self.update_frame)
+        self.video_thread.error_occurred.connect(self.handle_error)
+        self.video_thread.start()
+    
+    def update_frame(self, frame, detections):
+        """Atualiza frame no QLabel com bounding boxes"""
+        try:
+            # Fazer cópia para desenhar
+            display_frame = frame.copy()
+            
+            # Desenhar detecções
+            suspicious_count = 0
+            for det in detections:
+                x1, y1, x2, y2 = det['bbox']
+                class_name = det['class']
+                conf = det['conf']
+                is_suspicious = det['suspicious']
+                
+                # Cor: vermelho se suspeito, verde se normal
+                color = (0, 0, 255) if is_suspicious else (0, 255, 0)
+                
+                # Desenhar bbox
+                cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+                
+                # Label
+                label = f"{class_name} {conf:.2f}"
+                label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(display_frame, (x1, y1 - label_size[1] - 10), 
+                             (x1 + label_size[0], y1), color, -1)
+                cv2.putText(display_frame, label, (x1, y1 - 5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                
+                if is_suspicious:
+                    suspicious_count += 1
+            
+            # Converter BGR para RGB
+            rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_frame.shape
+            bytes_per_line = ch * w
+            
+            # Criar QImage
+            qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            
+            # Redimensionar mantendo aspecto
+            scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
+                self.video_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            
+            self.video_label.setPixmap(scaled_pixmap)
+            
+            # Atualizar status
+            self.status_label.setText(f"Live - {w}x{h} @ 30fps | Detections: {len(detections)}")
+            
+            # Alertas
+            if suspicious_count > 0:
+                self.alert_label.setText(f"⚠ {suspicious_count} suspicious object(s) detected!")
+            else:
+                self.alert_label.setText("")
+            
+        except Exception as e:
+            logger.error(f"Error updating frame: {e}")
+    
+    def handle_error(self, error_msg):
+        """Trata erros de stream"""
+        self.video_label.setText(f"✗ Stream Error\n\n{error_msg}")
+        self.status_label.setText("Disconnected")
+    
+    def closeEvent(self, event):
+        """Para thread ao fechar"""
+        if self.video_thread:
+            self.video_thread.stop()
+        event.accept()
 
 
 class CamerasPage(QWidget):
@@ -38,16 +235,25 @@ class CamerasPage(QWidget):
         title_font.setBold(True)
         title.setFont(title_font)
         main_layout.addWidget(title)
+        
+        # Status label for inline feedback (replaces QMessageBox)
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        self.status_label.setMinimumHeight(30)
+        self.status_label.hide()
+        main_layout.addWidget(self.status_label)
 
+        # Camera form (RTSP Direct - simplified)
         form_layout = QVBoxLayout()
+        
         form_layout.addWidget(QLabel("Camera Name:"))
         self.camera_name = QLineEdit()
-        self.camera_name.setPlaceholderText("e.g., Front Door, Parking Lot")
+        self.camera_name.setPlaceholderText("e.g., Front Door, Parking Lot, Store Entrance")
         form_layout.addWidget(self.camera_name)
 
         form_layout.addWidget(QLabel("RTSP URL:"))
         self.rtsp_url = QLineEdit()
-        self.rtsp_url.setPlaceholderText("e.g., rtsp://192.168.1.100:554/stream")
+        self.rtsp_url.setPlaceholderText("e.g., rtsp://192.168.0.20:8080/h264.sdp")
         form_layout.addWidget(self.rtsp_url)
 
         button_layout = QHBoxLayout()
@@ -58,20 +264,36 @@ class CamerasPage(QWidget):
         button_layout.addWidget(add_btn)
         button_layout.addWidget(test_btn)
         form_layout.addLayout(button_layout)
-
+        
         main_layout.addLayout(form_layout)
 
         main_layout.addWidget(QLabel("Configured Cameras:"))
         self.cameras_table = QTableWidget()
-        self.cameras_table.setColumnCount(5)
+        self.cameras_table.setColumnCount(6)
         self.cameras_table.setHorizontalHeaderLabels(
-            ["ID", "Name", "RTSP URL", "Status", "Actions"]
+            ["ID", "Name", "RTSP URL", "Status", "Actions", "View"]
         )
-        self.cameras_table.setColumnWidth(2, 250)
+        self.cameras_table.setColumnWidth(0, 50)   # ID
+        self.cameras_table.setColumnWidth(1, 150)  # Name
+        self.cameras_table.setColumnWidth(2, 280)  # RTSP URL
+        self.cameras_table.setColumnWidth(3, 80)   # Status
+        self.cameras_table.setColumnWidth(4, 150)  # Actions
+        self.cameras_table.setColumnWidth(5, 100)  # View
         main_layout.addWidget(self.cameras_table)
 
         main_layout.addStretch()
         self.setLayout(main_layout)
+    
+    def show_status(self, message: str, status_type: str = "info", duration: int = 5000):
+        """Show inline status message instead of QMessageBox"""
+        self.status_label.setText(message)
+        self.status_label.setProperty("feedbackType", status_type)
+        self.status_label.setStyleSheet(self.status_label.styleSheet())  # Refresh style
+        self.status_label.show()
+        
+        # Auto-hide after duration
+        if duration > 0:
+            QTimer.singleShot(duration, self.status_label.hide)
 
     def add_camera(self):
         name = self.camera_name.text().strip()
@@ -79,15 +301,15 @@ class CamerasPage(QWidget):
 
         user_id = self.auth_manager.get_user_id()
         if not user_id:
-            QMessageBox.warning(self, "Error", "You must be logged in to add cameras")
+            self.show_status("✗ You must be logged in to add cameras", "error")
             return
 
         if not name or not rtsp_url:
-            QMessageBox.warning(self, "Error", "Please fill all fields")
+            self.show_status("✗ Please fill all fields", "error")
             return
 
         if not rtsp_url.startswith("rtsp://"):
-            QMessageBox.warning(self, "Error", "RTSP URL must start with rtsp://")
+            self.show_status("✗ RTSP URL must start with rtsp://", "error")
             return
 
         try:
@@ -97,21 +319,199 @@ class CamerasPage(QWidget):
                 rtsp_url,
                 start_processor=self.engine_manager.is_running
             )
-            QMessageBox.information(self, "Success", "Camera added successfully!")
+            self.show_status(f"✓ Camera '{name}' added successfully!", "success")
             self.camera_name.clear()
             self.rtsp_url.clear()
             self.refresh()
         except Exception as e:
             logger.error(f"Error adding camera: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to add camera: {e}")
+            self.show_status(f"✗ Failed to add camera: {e}", "error")
+
+    def add_intelbras_camera(self):
+        """Add Intelbras camera via Cloud/P2P"""
+        name = self.intelbras_name.text().strip()
+        device_id = self.device_id.text().strip()
+        device_password = self.device_password.text().strip()
+        cloud_user = self.cloud_user.text().strip()
+        
+        user_id = self.auth_manager.get_user_id()
+        if not user_id:
+            self.show_status("✗ You must be logged in to add cameras", "error")
+            return
+        
+        if not name or not device_id or not device_password:
+            self.show_status("✗ Please fill Name, Device ID and Password", "error")
+            return
+        
+        try:
+            # Import Intelbras integration
+            from src.ai.onvif_discovery import discover_intelbras_p2p
+            
+            self.show_status(f"🔍 Connecting to Intelbras device {device_id}...", "info", 0)
+            QApplication.processEvents()
+            
+            # Try to get P2P URL from device
+            rtsp_url = discover_intelbras_p2p(device_id, device_password, cloud_user)
+            
+            if rtsp_url:
+                camera_id = self.db_manager.add_camera(user_id, name, rtsp_url)
+                self.camera_manager.add_camera_processor(
+                    camera_id,
+                    rtsp_url,
+                    start_processor=self.engine_manager.is_running
+                )
+                self.show_status(f"✓ Intelbras camera '{name}' added successfully!", "success")
+                self.intelbras_name.clear()
+                self.device_id.clear()
+                self.device_password.clear()
+                self.cloud_user.clear()
+                self.refresh()
+            else:
+                self.show_status(f"✗ Could not connect to device {device_id}", "error")
+                
+        except Exception as e:
+            logger.error(f"Error adding Intelbras camera: {e}", exc_info=True)
+            self.show_status(f"✗ Failed to add Intelbras camera: {e}", "error")
+    
+    def discover_onvif_cameras(self):
+        """Discover ONVIF cameras on network"""
+        try:
+            from src.ai.onvif_discovery import discover_onvif_cameras
+            
+            self.show_status("🔍 Scanning network for ONVIF cameras (30s timeout)...", "info", 0)
+            QApplication.processEvents()
+            
+            cameras = discover_onvif_cameras(timeout=30)
+            
+            if cameras:
+                msg = f"✓ Found {len(cameras)} cameras:\n"
+                for cam in cameras:
+                    msg += f"• {cam['name']} at {cam['ip']}\n"
+                self.show_status(msg, "success", 15000)
+                
+                # Auto-fill first camera if available
+                if cameras and not self.rtsp_url.text():
+                    first = cameras[0]
+                    self.camera_name.setText(first.get('name', 'ONVIF Camera'))
+                    # Try to construct RTSP URL
+                    ip = first.get('ip', '')
+                    if ip:
+                        # Standard ONVIF RTSP path
+                        self.rtsp_url.setText(f"rtsp://{ip}:554/onvif1")
+            else:
+                self.show_status("⚠ No ONVIF cameras found on network", "warning", 10000)
+                
+        except Exception as e:
+            logger.error(f"Error discovering ONVIF: {e}", exc_info=True)
+            self.show_status(f"✗ Failed to discover cameras: {e}", "error")
 
     def test_connection(self):
         rtsp_url = self.rtsp_url.text().strip()
         if not rtsp_url:
-            QMessageBox.warning(self, "Error", "Please enter RTSP URL")
+            self.show_status("✗ Please enter RTSP URL", "error")
             return
 
-        QMessageBox.information(self, "Testing", "Connection test would be performed here")
+        # Testar conexão RTSP real com diagnóstico detalhado
+        try:
+            import cv2
+            import time
+            
+            # Feedback inline durante teste
+            self.show_status("⟳ Testing RTSP connection... (up to 10 seconds)", "info", duration=0)
+            QApplication.processEvents()
+            
+            # Configurações para melhor compatibilidade
+            backends = [
+                (cv2.CAP_FFMPEG, "FFmpeg"),
+                (cv2.CAP_ANY, "Auto")
+            ]
+            
+            success = False
+            error_details = []
+            backend_used = ""
+            
+            for backend, backend_name in backends:
+                try:
+                    logger.info(f"Tentando conectar via {backend_name}: {rtsp_url}")
+                    
+                    # Configurar VideoCapture com timeout e buffer mínimo
+                    cap = cv2.VideoCapture(rtsp_url, backend)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    
+                    # Aguardar até 10 segundos
+                    timeout = 10.0
+                    start = time.time()
+                    
+                    while time.time() - start < timeout:
+                        if cap.isOpened():
+                            ret, frame = cap.read()
+                            if ret and frame is not None:
+                                h, w = frame.shape[:2]
+                                success = True
+                                backend_used = backend_name
+                                logger.info(f"✓ Conectado via {backend_name}: {w}x{h}")
+                                break
+                        time.sleep(0.2)
+                        QApplication.processEvents()
+                    
+                    cap.release()
+                    
+                    if success:
+                        break
+                    else:
+                        error_details.append(f"{backend_name}: timeout após {timeout}s")
+                        
+                except Exception as e:
+                    error_details.append(f"{backend_name}: {str(e)}")
+                    logger.error(f"Erro com {backend_name}: {e}")
+            
+            if success:
+                self.show_status(
+                    f"✓ Connected via {backend_used}! Resolution: {w}x{h}",
+                    "success",
+                    8000
+                )
+            else:
+                # Diagnóstico detalhado
+                diagnostics = "\n".join([
+                    "✗ Connection failed",
+                    f"URL: {rtsp_url}",
+                    "",
+                    "Tried:",
+                ] + [f"  • {detail}" for detail in error_details] + [
+                    "",
+                    "Common issues:",
+                    "  • Wrong port (try 554, 8080, 8554)",
+                    "  • Wrong path (try /h264, /stream, /cam/realmonitor)",
+                    "  • Authentication required (add user:pass@ before IP)",
+                    "  • Camera not on network or firewall blocking"
+                ])
+                
+                self.show_status(diagnostics, "error", 15000)
+                logger.warning(f"RTSP test failed: {rtsp_url}")
+                
+        except Exception as e:
+            self.show_status(f"✗ Test failed: {str(e)}", "error")
+    
+    def view_live(self, rtsp_url, camera_name):
+        """Navega para visualização ao vivo"""
+        try:
+            # Obter referência ao MainWindow
+            main_window = self.window()
+            if not hasattr(main_window, 'live_view_page'):
+                logger.error("MainWindow does not have live_view_page")
+                self.show_status("✗ Live view page not available", "error")
+                return
+            
+            # Iniciar stream na página de live view
+            main_window.live_view_page.start_stream(rtsp_url, camera_name)
+            
+            # Navegar para a página live
+            main_window.navigate_to("live")
+            
+        except Exception as e:
+            logger.error(f"Error opening live view: {e}", exc_info=True)
+            self.show_status(f"✗ Failed to open live view: {e}", "error")
 
     def refresh(self):
         try:
@@ -132,9 +532,39 @@ class CamerasPage(QWidget):
                 self.cameras_table.setItem(row, 1, QTableWidgetItem(camera["name"]))
                 self.cameras_table.setItem(row, 2, QTableWidgetItem(camera["rtsp_url"]))
                 self.cameras_table.setItem(row, 3, QTableWidgetItem(status_text.capitalize()))
-                self.cameras_table.setItem(row, 4, QTableWidgetItem(""))
+                
+                # Botões de ação (Delete)
+                actions_widget = QWidget()
+                actions_layout = QHBoxLayout()
+                actions_layout.setContentsMargins(4, 2, 4, 2)
+                actions_layout.setSpacing(4)
+                
+                delete_btn = QPushButton("Delete")
+                delete_btn.setMaximumWidth(70)
+                delete_btn.clicked.connect(lambda checked, cid=camera_id: self.delete_camera(cid))
+                actions_layout.addWidget(delete_btn)
+                
+                actions_widget.setLayout(actions_layout)
+                self.cameras_table.setCellWidget(row, 4, actions_widget)
+                
+                # Botão View Live
+                view_btn = QPushButton("View Live")
+                view_btn.setMaximumWidth(90)
+                view_btn.clicked.connect(lambda checked, url=camera["rtsp_url"], name=camera["name"]: self.view_live(url, name))
+                self.cameras_table.setCellWidget(row, 5, view_btn)
         except Exception as e:
             logger.error(f"Error refreshing cameras: {e}")
+    
+    def delete_camera(self, camera_id):
+        """Deleta câmera"""
+        try:
+            self.db_manager.delete_camera(camera_id)
+            self.camera_manager.remove_camera_processor(camera_id)
+            self.show_status(f"✓ Camera deleted successfully", "success")
+            self.refresh()
+        except Exception as e:
+            logger.error(f"Error deleting camera: {e}")
+            self.show_status(f"✗ Failed to delete camera: {e}", "error")
 
 
 class ZonesPage(QWidget):

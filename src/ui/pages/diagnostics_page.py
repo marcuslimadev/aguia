@@ -4,7 +4,7 @@ Página de diagnósticos e observabilidade
 import logging
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit,
-    QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QProgressBar, QGroupBox
+    QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QProgressBar, QGroupBox, QFileDialog
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
@@ -45,6 +45,13 @@ class DiagnosticsPage(QWidget):
         title_font.setBold(True)
         title.setFont(title_font)
         main_layout.addWidget(title)
+        
+        # Status label para feedback inline
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        self.status_label.setMinimumHeight(30)
+        self.status_label.hide()
+        main_layout.addWidget(self.status_label)
 
         # Tabs
         tabs = QTabWidget()
@@ -400,19 +407,27 @@ Store Build: {'Yes' if self.license_manager.is_store_build else 'No'}
         if file_path:
             try:
                 # Aqui você implementaria exportação de logs
-                QMessageBox.information(self, "Success", "Logs exported successfully!")
+                self.show_status("✓ Logs exported successfully!", "success")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to export logs: {e}")
+                self.show_status(f"✗ Failed to export logs: {e}", "error")
+
+    def show_status(self, message: str, status_type: str = "info", duration: int = 5000):
+        """Show inline status message"""
+        self.status_label.setText(message)
+        self.status_label.setProperty("feedbackType", status_type)
+        self.status_label.setStyleSheet(self.status_label.styleSheet())
+        self.status_label.show()
+        
+        if duration > 0:
+            QTimer.singleShot(duration, self.status_label.hide)
 
     def clear_cache(self):
         """Limpa cache"""
-        from PySide6.QtWidgets import QMessageBox
-
         try:
             # Aqui você implementaria limpeza de cache
-            QMessageBox.information(self, "Success", "Cache cleared successfully!")
+            self.show_status("✓ Cache cleared successfully!", "success")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to clear cache: {e}")
+            self.show_status(f"✗ Failed to clear cache: {e}", "error")
 
     def closeEvent(self, event):
         """Limpar timer ao fechar"""

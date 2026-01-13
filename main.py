@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from config.config import APP_NAME, APP_VERSION, APP_DATA_DIR
 from src.core import DatabaseManager, AuthManager, CameraManager
@@ -23,7 +23,7 @@ def check_system_requirements():
     try:
         import cv2
         import numpy as np
-        import onnxruntime
+        # import onnxruntime  # Não disponível para Python 3.14 - shoplifting detector desabilitado
         logger.info("[OK] All essential dependencies are installed")
         return True
     except ImportError as e:
@@ -48,11 +48,7 @@ def main():
 
     try:
         if not check_system_requirements():
-            QMessageBox.critical(
-                None,
-                "Missing Dependencies",
-                "Some required dependencies are missing. Install with: pip install -r requirements.txt"
-            )
+            logger.error("✗ Missing dependencies - install with: pip install -r requirements.txt")
             sys.exit(1)
 
         logger.info("Initializing components...")
@@ -93,11 +89,8 @@ def main():
 
     except Exception as e:
         logger.error(f"Startup error: {e}", exc_info=True)
-        QMessageBox.critical(
-            None,
-            "Startup Error",
-            f"Failed to start application: {str(e)}"
-        )
+        logger.error(f"✗ Failed to start application: {str(e)}")
+        sys.exit(1)
         sys.exit(1)
 
 
